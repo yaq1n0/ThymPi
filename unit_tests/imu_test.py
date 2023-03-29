@@ -4,35 +4,32 @@
 
 from mpu6050 import mpu6050
 
+import time
 import numpy as np
-
 import matplotlib.pyplot as plt
 
 sensor = mpu6050(0x68)
 
-xyz = []
+t, x, y, z = [], [], [], []
 
-for i in range(100):
+start_time = time.process_time_ns()
+end_time = time.process_time_ns() + (5 * 1000000000) # 5 seconds
+
+while time.process_time_ns() <= end_time:
     acc_data = sensor.get_gyro_data()
     # returns acc_data in dict form ("x", "y", "z")
-    
-    xyz.append((acc_data["x"], acc_data["y"], acc_data["z"]))
 
-label = []
-x = []
-y = []
-z = []
+    t.append(time.process_time_ns())
+    x.append(acc_data["x"])
+    y.append(acc_data["y"])
+    z.append(acc_data["z"])
 
-for i in range(100):
-    label.append(i)
-    x.append(xyz[0])
-    y.append(xyz[1])
-    z.append(xyz[2])
-    
-#plt.plot(label, x)
-#plt.show()
+plt.plot(t, x)
+plt.plot(t, y)
+plt.plot(t, z)
 
-print(z)
+plt.show()
+
                 
         
     
