@@ -20,4 +20,5 @@
 - **To initialize:** "asebamedulla ser:name=Thymio-II"
 - **To inititalize using python:** _os.system("(asebamedulla ser:name=Thymio-II &) && sleep 0.3")_
 
-
+#### To push local commits to master branch of remote repo using token
+git push https://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@github.com/yaq1n0/ThymPi.git master
