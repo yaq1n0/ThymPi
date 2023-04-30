@@ -11,6 +11,8 @@ def testCompliance(object_class, aseba_network):
     time.sleep(2)
 
     setSpeed(aseba_network, 0, 0)
+    
+    return object_class, 1.0
 
 
 def setupIMU():
@@ -24,6 +26,7 @@ def setupThymio(os_setup):
 
     # set up thymio dbus
     import dbus
+    import dbus.mainloop.glib
 
     # init the dbus main loop
     dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
@@ -61,5 +64,5 @@ if __name__ == '__main__':
     # setup MPU6050 IMU
     setupIMU()
 
-    testCompliance(aseba_network)
+    print(testCompliance("placeholder", aseba_network))
 
