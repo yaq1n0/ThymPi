@@ -42,7 +42,13 @@ class ThymPi:
         self.sensor = None
         self.calibration_duration = 1  # mpu6050 calibration duration (seconds, default=1)
         self.test_duration = 2  # compliance test duration (seconds, default=2)
+        self.test_speed = 500  # compliance test speed (default=500)
         self.frame_size = 50  # accelerometer reading frame size (default=50)
+        
+        # call setup methods
+        self.setupModel()
+        self.setupThymio()
+        self.setupIMU()
 
     def setupModel(self):
         if self.verbose:
@@ -60,7 +66,7 @@ class ThymPi:
             self.compliances[class_name] = None
 
         self.net = cv2.dnn_DetectionModel(weightsFile, configFile)
-        self.net.setInputSize(120, 120)
+        self.net.setInputSize(320, 320)
         self.net.setInputScale(1.0 / 127.5)
         self.net.setInputMean((127.5, 127.5, 127.5))
         self.net.setInputSwapRB(True)
@@ -108,8 +114,7 @@ class ThymPi:
 
         return avg, error
 
-    def testCompliance(self, class_name):
-
+    def testComplianceFrameBased(self, class_name):
         # perform calibration at start (stop, wait and calibrate)
         self.setSpeed(0, 0)
         time.sleep(0.2)
@@ -117,7 +122,7 @@ class ThymPi:
         c_mean, c_error = self.calibrateSensor()
         noise_floor = round(c_error - c_mean, 2)
 
-        self.setSpeed(500, 500)
+        self.setSpeed(self.test_speed, self.test_speed)
 
         xs = []
         accel_events = []
@@ -125,7 +130,7 @@ class ThymPi:
         i = 0
 
         end = time.time() + self.test_duration
-
+        
         while (time.time() <= end):
             xs.append(self.sensor.get_accel_data()["x"])
             i += 1
@@ -145,7 +150,7 @@ class ThymPi:
                         print("decel event: " + str(avg_lastx))
                     decel_events.append(avg_lastx)
 
-        self.setSpeed(0, 0)
+        self.goBackCM(10)
 
         compliance = self.getCompliance(decel_events)
         self.compliances[class_name] = compliance
@@ -153,25 +158,28 @@ class ThymPi:
         if self.verbose:
             print("known compliances: ")
             for comp in self.compliances:
-                print("class: {} | compliance: {}".format(comp, self.compliances[comp]))
+                if self.compliances[comp] != None: 
+                    print("class: {} | compliance: {}".format(comp, self.compliances[comp]))
 
     def getCompliance(self, decel_events):
         # calculate compliance from list of deceleration events
         # first decel is most important (collision event)
         # multiple deceleration events suggests object is moving but putting up resistance in movement
+        # at 500 testing_speed, full non compliance is around -1g
 
         compliance = 1.0
 
         if len(decel_events) > 0:
             for i in range(len(decel_events)):
-                compliance = compliance - abs(decel_events[i] / (i + 1))
+                scaling = 500 / self.test_speed
+                compliance = compliance - (scaling * abs(decel_events[i] / (i + 1)))
         else:
             pass
 
         if compliance < 0:
             compliance = 0  # cap compliance at 0
 
-        return compliance
+        return round(compliance, 2)
 
     def getObjects(self, img):
         classIds, confs, bbox = self.net.detect(img,
@@ -179,19 +187,38 @@ class ThymPi:
                                                 nmsThreshold=self.nms_threshold
                                                 )
 
-        objects = self.class_names
+        objects = {}
+        
+        if len(classIds) > 0: 
+            obj_names = []
+            obj_confidences = []
 
-        for classId in classIds:
-            objects.append(self.class_names[classId - 1])
+            for classId in classIds:
+                obj_names.append(self.class_names[classId - 1])
+                
+            for conf in confs:
+                obj_confidences.append(round(conf * 100, 0))
+                
+            objects = dict(zip(obj_names, obj_confidences))
 
-        if self.verbose:
-            print(objects)
+            if self.verbose:
+                print(objects)
 
         return objects
 
     def setSpeed(self, left, right):
         self.aseba_network.SendEventName('motor.target', [left, right])
-
+        
+    def goBackCM(self, distance_cm, speed=250): 
+        # go back x centimeters
+        # 500 motor speed is roughly ~20cm/s
+        # default speed=250 (~10cm/s)
+        
+        duration = round(distance_cm / (speed / 25), 0)
+        thympi.setSpeed(-1 * speed, -1 * speed)
+        time.sleep(duration)
+        thympi.setSpeed(0,0)
+        
 
 if __name__ == '__main__':
     # create thympi object
@@ -199,24 +226,41 @@ if __name__ == '__main__':
 
     # start video capture
     cap = cv2.VideoCapture(0)
-    cap.set(3, 1920)
-    cap.set(4, 1080)
+    cap.set(3, 640)
+    cap.set(4, 480)
 
-    while True:
-        # if center prox detects something
+    while True:   
         if thympi.aseba_network.GetVariable('thymio-II', 'prox.horizontal')[2] > 0:
+            # if center prox detects something, (detection distance ~ 10cm)
+            if thympi.verbose: 
+                print("object in proximity!")
+
             objects = []
-
-            if thympi.verbose:
-                print("attempting to detect objects")
-
+            
+            # go back 10cm (20cm tends to detect most objects)
+            thympi.goBackCM(10)
+            
+            thympi.confidence_threshold = 0.5
             while len(objects) == 0:
+                if thympi.verbose:
+                    print("attempting to detect objects")
                 success, img = cap.read()
                 objects = thympi.getObjects(img)
+                thympi.confidence_threshold -= 0.025
 
             for object in objects:
-                print(str(object) + " detected")
-
-            first_object = objects[0]
-
-            thympi.testCompliance(first_object)
+                print("{} detected with {}% confidence".format(object, objects[object]))
+            
+            maxConfObject = max(objects, key=objects.get)
+            
+            if thympi.compliances[maxConfObject] != None:
+                print("compliance of {} is known to be {}".format(maxConfObject, thympi.compliances[maxConfObject]))
+                tmp = input("do you want to retest the compliance of {}?: ".format(maxConfObject))
+                if tmp == "yes" or tmp == "y":
+                    thympi.testCompliance(maxConfObject)
+                elif tmp == "no" or tmp == "n":
+                    pass
+            elif thympi.compliances[maxConfObject] == None:
+                if thympi.verbose:
+                    print("automatically testing compliance of {}".format(maxConfObject))
+                    thympi.testCompliance(maxConfObject)
