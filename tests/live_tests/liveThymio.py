@@ -1,7 +1,7 @@
 
-# live control of Thymio using terminal
+# live control of Thymio using pygame loop
 # pygame example: https://www.edureka.co/blog/snake-game-with-pygame/
-# pygame keys: https://www.pygame.org/docs/ref/key.html
+# pygame key reference: https://www.pygame.org/docs/ref/key.html
 
 import pygame
 import os
@@ -81,7 +81,6 @@ test_over = False
 
 
 while not test_over:
-    #print(asebaNetwork.GetVariable('thymio-II', 'prox.horizontal')[2])
     for event in pygame.event.get():
         # print(event)
         if event.type == pygame.KEYDOWN:
@@ -93,16 +92,16 @@ while not test_over:
                 setSpeed(0,0)
             elif event.key == pygame.K_w:
                 print("forward")
-                setSpeed(500,500)
+                modSpeed(100, 100)
             elif event.key == pygame.K_a:
                 print("left")
-                #modSpeed(-100,100)
+                modSpeed(-100,100)
             elif event.key == pygame.K_s:
                 print("backward")
-                setSpeed(-100,-100)
+                modSpeed(-100,-100)
             elif event.key == pygame.K_d:
                 print("right")
-                #modSpeed(100,-100)
+                modSpeed(100,-100)
 
             
 pygame.quit()

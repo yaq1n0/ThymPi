@@ -1,4 +1,3 @@
-
 # testing controlling Thymio with Raspberry Pi using AsebaMedulla
 # based on: https://github.com/lebalz/thympi
 
@@ -8,15 +7,17 @@ import time
 import dbus
 import dbus.mainloop.glib
 
-
 # initialize asebamedulla in background (using terminal) and wait 0.5s to let it setup
 os.system("(asebamedulla ser:name=Thymio-II &) && sleep 0.5")
+
 
 def dbusReply():
     pass
 
+
 def dbusError():
     pass
+
 
 # init the dbus main loop
 dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
@@ -29,7 +30,7 @@ asebaNetworkObject = bus.get_object('ch.epfl.mobots.Aseba', '/')
 asebaNetwork = dbus.Interface(asebaNetworkObject, dbus_interface='ch.epfl.mobots.AsebaNetwork')
 
 # load the file which is run on the thymio
-asebaNetwork.LoadScripts('thympi.aesl',reply_handler=dbusReply,error_handler=dbusError)
+asebaNetwork.LoadScripts('thympi.aesl', reply_handler=dbusReply, error_handler=dbusError)
 
 
 def setSpeed(speed):
@@ -38,7 +39,7 @@ def setSpeed(speed):
     asebaNetwork.SendEventName(
         'motor.target',
         [left_wheel, right_wheel]
-        )
+    )
 
 
 setSpeed(0)
