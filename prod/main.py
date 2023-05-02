@@ -20,7 +20,7 @@ import dbus.mainloop.glib
 from mpu6050 import mpu6050
 
 # compliance lib imports
-from lib.compliance import getEventSize
+from lib.compliance import calcCompliance
 
 
 class ThymPi:
@@ -112,7 +112,7 @@ class ThymPi:
         end = time.time() + self.calibration_duration
 
         while time.time() <= end:
-            xs.append(self.sensor.get_accel_data()["x"])
+            xs.append(self.sensor.get_accel_data(g=False)["x"])
 
         avg = sum(xs) / len(xs)
         error = (max(xs) - min(xs)) / 2
@@ -146,7 +146,7 @@ class ThymPi:
         end = time.time() + self.test_duration
 
         while time.time() <= end:
-            x = self.sensor.get_accel_data()["x"] - c_mean
+            x = self.sensor.get_accel_data(g=False)["x"] - c_mean
             xs.append(x)
 
             # NOTE: might work without this
@@ -182,7 +182,7 @@ class ThymPi:
         # go back 10 cm after test
         self.goBackCM(10)
 
-        compliance = self.caclCompliance(accel_events, decel_events)
+        compliance = calcCompliance(accel_events, decel_events)
         self.compliances[class_name] = compliance
 
         if self.verbose:
