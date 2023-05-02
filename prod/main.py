@@ -19,6 +19,9 @@ import dbus.mainloop.glib
 # mpu6050 imports
 from mpu6050 import mpu6050
 
+# compliance lib imports
+from lib.compliance import getEventSize
+
 
 class ThymPi:
     def __init__(self):
@@ -49,6 +52,9 @@ class ThymPi:
         self.setupModel()
         self.setupThymio()
         self.setupIMU()
+
+        if self.verbose:
+            print("setup complete! \n")
 
     def setupModel(self):
         if self.verbose:
@@ -97,6 +103,11 @@ class ThymPi:
             print(error)
 
     def calibrateSensor(self):
+        # stop and wait
+        self.setSpeed(0, 0)
+        time.sleep(0.2)
+
+        # start calibration
         xs = []
         end = time.time() + self.calibration_duration
 
@@ -114,125 +125,64 @@ class ThymPi:
 
         return avg, error
 
-    def testComplianceFrameBased(self, class_name):
+    def testCompliance(self, class_name):
         # perform calibration at start (stop, wait and calibrate)
-        self.setSpeed(0, 0)
-        time.sleep(0.2)
-
         c_mean, c_error = self.calibrateSensor()
-        noise_floor = round(c_error - c_mean, 2)
+        noise_floor = 2 * (c_error - c_mean)
 
+        # start test
         self.setSpeed(self.test_speed, self.test_speed)
 
         xs = []
         accel_events = []
         decel_events = []
-        i = 0
 
-        end = time.time() + self.test_duration
-
-        while (time.time() <= end):
-            xs.append(self.sensor.get_accel_data()["x"])
-            i += 1
-
-            # only perform calculations every time frame size is reached
-            if i % self.frame_size == 0 and i > self.frame_size:
-                # take average of readings in last frame and normalize with calibration average
-                avg_lastx = (sum(xs[-self.frame_size:]) / len(xs[-self.frame_size:])) - c_mean
-
-                # use calibration error to ignore noise
-                if avg_lastx > noise_floor:
-                    if self.verbose:
-                        print("accel event: " + str(avg_lastx))
-                    accel_events.append(avg_lastx)
-                elif avg_lastx < (-1 * noise_floor):
-                    if self.verbose:
-                        print("decel event: " + str(avg_lastx))
-                    decel_events.append(avg_lastx)
-
-        self.goBackCM(10)
-
-        compliance = self.getCompliance(decel_events)
-        self.compliances[class_name] = compliance
-
-        if self.verbose:
-            print("known compliances: ")
-            for comp in self.compliances:
-                if self.compliances[comp] != None:
-                    print("class: {} | compliance: {}".format(comp, self.compliances[comp]))
-
-    def testCompliance(self, class_name):
-        # perform calibration at start (stop, wait and calibrate)
-        self.setSpeed(0, 0)
-        time.sleep(0.2)
-
-        c_mean, c_error = self.calibrateSensor()
-        noise_floor = 2 * round(c_error - c_mean, 2)
-
-        self.setSpeed(self.test_speed, self.test_speed)
-
-        xs = []
         accel_event = []
         decel_event = []
 
-        accel_events = []
-        decel_events = []
         i = 0
-        prev = 0
+        prev = None
 
         end = time.time() + self.test_duration
 
-        def w_avg(_list):
-            # changes to accel/decel event averaging to better represent spike
-            weights = [2, 1, 0.5, 0.33, 0.25, 0.2, 0.2, 0.1, 0.1, 0.1]
-            if len(_list) <= len(weights):
-                while len(_list) < len(weights):
-                    _list.append(0)
-                wsum = 0
-                for i in range(len(_list)):
-                    wsum += _list[i] * weights[i]
-                wavg = wsum / len(_list)
-                return wavg
-            else:
-                if self.verbose:
-                    print("error weigted_avg10: input list size incorrect, size={}".format(len(_list)))
-                return _list
-
-        while (time.time() <= end):
+        while time.time() <= end:
             x = self.sensor.get_accel_data()["x"] - c_mean
             xs.append(x)
-            
-            # might fix
+
+            # NOTE: might work without this
             if i == 0:
                 prev = x
-            # only perform calculations every time an accel_event or decel_event occurs
+
+            # only perform calculations every time an accel_event or decel_event finishes
             if x > noise_floor:
                 if prev > noise_floor:
                     # accel -> accel
                     accel_event.append(x)
+
                 elif prev <= -1 * noise_floor:
                     # decel -> accel
                     if len(decel_event) > 0:
-                        decel_events.append(w_avg(decel_event[-10:]))
+                        decel_events.append(decel_event)
                         decel_event = []
 
             elif x <= -1 * noise_floor:
                 if prev > noise_floor:
                     # accel -> decel
                     if len(accel_event) > 0:
-                        accel_events.append(w_avg(accel_event[-10:]))
+                        accel_events.append(accel_event)
                         accel_event = []
-                        
+
                 elif prev <= -1 * noise_floor:
                     # decel -> decel
                     decel_event.append(x)
-            
+
             prev = x
             i += 1
 
+        # go back 10 cm after test
         self.goBackCM(10)
 
-        compliance = self.getCompliance(accel_events, decel_events)
+        compliance = self.caclCompliance(accel_events, decel_events)
         self.compliances[class_name] = compliance
 
         if self.verbose:
@@ -241,30 +191,6 @@ class ThymPi:
                 if self.compliances[comp] != None:
                     print("class: {} | compliance: {}".format(comp, self.compliances[comp]))
 
-    def getCompliance(self, accel_events, decel_events):
-        # calculate compliance from list of acceleration and deceleration events
-        # NOTE: modify this function to change how compliance is calculated
-        
-        # current algorithm
-        # TODO: remove test_speed and scaling stuff
-        # take abs value of top decel event and use -25 as max decel
-        # calculate based on inverse ratio
-        decel_events.sort()
-        
-        if self.verbose:
-            p = []
-            for d in decel_events[-10:]:
-                p.append(round(d,2))
-                
-            print(p)
-                
-        top = abs(decel_events[0])
-        compliance = 1.0 - (top / 25)
-
-        if compliance < 0:
-            compliance = 0  # cap compliance at 0
-
-        return round(compliance, 2)
 
     def getObjects(self, img):
         classIds, confs, bbox = self.net.detect(img,
