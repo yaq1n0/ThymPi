@@ -1,4 +1,6 @@
+
 # combining imu_test and thymio_test
+# preprogrammed commands for testing
 
 from mpu6050 import mpu6050
 

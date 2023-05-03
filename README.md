@@ -1,21 +1,27 @@
 # Setup Guide: 
 
-#### Python version used: Python 3.7+
+This setup guide isn't step by step but instead a rough guide to help you get started 
+as a lot of the installation process is highly dependent on the platform you intend to run this on. 
 
-#### Non-standard libraries used:
-- numpy
-- matplotlib
-- picamera
-<br>- https://picamera.readthedocs.io/en/release-1.13/install.html
-<br>mpu6050
-<br>- https://github.com/m-rtijn/mpu6050
+**For reference, this is the development environment I used**
+<br>Computer: Raspberry Pi 3B+ 
+<br>Operating System: Raspberry Pi OS (legacy) 
+<br>_note: this is the debian 10 (buster) based version_
 
-#### Thymio setup:
-- **Guide:** https://github.com/lebalz/thympi
-- **Package download:** http://wiki.thymio.org/en:linuxinstall
-- Download "aseba_1.5.5_armhf.deb"
-- sudo dpkg -i aseba_1.5.5_armhf.deb
-- sudo apt-get update && sudo apt-get -f install
-- sudo apt-get install python-dbus python-gtk2
-- **To initialize:** "asebamedulla ser:name=Thymio-II"
-- **To inititalize using python:** _os.system("(asebamedulla ser:name=Thymio-II &) && sleep 0.3")_
+**MPU6050 Setup** 
+<br>The installation process for this is very simple, simply follow the instructions in the repository
+<br>Repository: https://github.com/m-rtijn/mpu6050
+
+**Pi Camera Setup**
+<br>In order to setup and enable the Pi Camera interface, follow the instructions at the link below
+<br>Pi Camera Documentation: https://picamera.readthedocs.io/en/release-1.13/install.html
+
+**Thymio Interface Setup**
+<br>The installation process for this is very well explained in the repository below
+<br>GitHub repository: https://github.com/lebalz/thympi
+
+**OpenCV Setup**
+<br>The OpenCV install process is very complicated and I suggest you look up the installation process
+for your own system.
+<br>However, the following article and forum is a good place to get started 
+<br>Core Electronics: https://core-electronics.com.au/guides/object-identify-raspberry-pi/

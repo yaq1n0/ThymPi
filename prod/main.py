@@ -4,11 +4,6 @@
 import os
 import time
 
-# possibly unnecessary
-import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib.animation as animation
-
 # opencv imports
 import cv2
 
@@ -46,7 +41,7 @@ class ThymPi:
         self.calibration_duration = 1  # mpu6050 calibration duration (seconds, default=1)
         self.test_duration = 2  # compliance test duration (seconds, default=2)
         self.test_speed = 500  # compliance test speed (default=500)
-        self.frame_size = 50  # accelerometer reading frame size (default=50)
+        self.frame_size = 50  # LEGACY: accelerometer reading frame size (default=50)
 
         # call setup methods
         self.setupModel()
@@ -191,7 +186,6 @@ class ThymPi:
                 if self.compliances[comp] != None:
                     print("class: {} | compliance: {}".format(comp, self.compliances[comp]))
 
-
     def getObjects(self, img):
         classIds, confs, bbox = self.net.detect(img,
                                                 confThreshold=self.confidence_threshold,
@@ -232,7 +226,7 @@ class ThymPi:
 
 
 if __name__ == '__main__':
-    # create thympi object
+    # create singleton instance
     thympi = ThymPi()
 
     # start video capture
@@ -257,21 +251,21 @@ if __name__ == '__main__':
                     print("attempting to detect objects")
                 success, img = cap.read()
                 objects = thympi.getObjects(img)
-                thympi.confidence_threshold -= 0.025
+                thympi.confidence_threshold -= 0.025  # reduce confidence threshold every time nothing is detected
 
-            for object in objects:
-                print("{} detected with {}% confidence".format(object, objects[object]))
+            for obj in objects:
+                print("{} detected with {}% confidence".format(obj, objects[obj]))
 
             maxConfObject = max(objects, key=objects.get)
 
-            if thympi.compliances[maxConfObject] != None:
+            if thympi.compliances[maxConfObject] is not None:
                 print("compliance of {} is known to be {}".format(maxConfObject, thympi.compliances[maxConfObject]))
                 tmp = input("do you want to retest the compliance of {}?: ".format(maxConfObject))
                 if tmp == "yes" or tmp == "y":
                     thympi.testCompliance(maxConfObject)
                 elif tmp == "no" or tmp == "n":
                     pass
-            elif thympi.compliances[maxConfObject] == None:
+            elif thympi.compliances[maxConfObject] is None:
                 if thympi.verbose:
                     print("automatically testing compliance of {}".format(maxConfObject))
                     thympi.testCompliance(maxConfObject)
